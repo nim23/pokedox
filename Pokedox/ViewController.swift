@@ -8,12 +8,17 @@
 
 import UIKit
 import AVFoundation
+import RxCocoa
+import RxSwift
 
 class ViewController: UIViewController, UICollectionViewDelegate, UICollectionViewDataSource, UICollectionViewDelegateFlowLayout {
     
     @IBOutlet weak var collectionView: UICollectionView!
+    @IBOutlet weak var searchBar: UISearchBar!
+    let disposeBag = DisposeBag()
     
     var pokemons = [Pokemon]()
+    var filteredPokemons = [Pokemon]()
     var musicPlayer: AVAudioPlayer!
 
     override func viewDidLoad() {
@@ -22,6 +27,7 @@ class ViewController: UIViewController, UICollectionViewDelegate, UICollectionVi
         collectionView.delegate = self
         parsePokemonCSV()
         initAudio()
+        observeSearchBar()
     }
     
     func initAudio() {
@@ -36,6 +42,28 @@ class ViewController: UIViewController, UICollectionViewDelegate, UICollectionVi
             print(err.debugDescription)
         }
     }
+    
+    func observeSearchBar() {
+        searchBar
+            .rx.text.orEmpty
+            .throttle(0.5, scheduler: MainScheduler.instance)
+            .distinctUntilChanged()
+            .subscribe( onNext: { [unowned self] query in
+                let pokemons = self.pokemons.filter{ $0.name.range(of: query.lowercased()) != nil}
+                
+                if query.characters.count > 0 && pokemons.count > 0 {
+                    self.filteredPokemons = pokemons
+                } else if query.characters.count > 0 && pokemons.count == 0 {
+                    self.filteredPokemons = [Pokemon]()
+                } else if query.characters.count == 0 {
+                    self.filteredPokemons = self.pokemons
+                }
+
+                self.collectionView.reloadData()
+            })
+            .addDisposableTo(disposeBag)
+    }
+    
     
     func parsePokemonCSV() {
         let path = Bundle.main.path(forResource: "pokemon", ofType: "csv")
@@ -57,7 +85,7 @@ class ViewController: UIViewController, UICollectionViewDelegate, UICollectionVi
     
     func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
         if let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "PokeCell", for: indexPath) as? PokeCell {
-            let pokemon = pokemons[indexPath.row]
+            let pokemon = filteredPokemons[indexPath.row]
             cell.configureCell(pokemon)
             return cell
         } else {
@@ -65,12 +93,8 @@ class ViewController: UIViewController, UICollectionViewDelegate, UICollectionVi
         }
     }
     
-    func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
-        
-    }
-    
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
-        return pokemons.count
+        return filteredPokemons.count
     }
     
     func numberOfSections(in collectionView: UICollectionView) -> Int {
