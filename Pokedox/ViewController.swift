@@ -57,13 +57,17 @@ class ViewController: UIViewController, UICollectionViewDelegate, UICollectionVi
                     self.filteredPokemons = [Pokemon]()
                 } else if query.characters.count == 0 {
                     self.filteredPokemons = self.pokemons
+                    self.view.endEditing(true)
                 }
-
                 self.collectionView.reloadData()
             })
             .addDisposableTo(disposeBag)
+        
+        searchBar.rx.searchButtonClicked
+         .subscribe(onNext: { [unowned self] _ in
+            self.view.endEditing(true)
+        }).addDisposableTo(disposeBag)
     }
-    
     
     func parsePokemonCSV() {
         let path = Bundle.main.path(forResource: "pokemon", ofType: "csv")
@@ -90,6 +94,21 @@ class ViewController: UIViewController, UICollectionViewDelegate, UICollectionVi
             return cell
         } else {
             return UICollectionViewCell()
+        }
+    }
+    
+    func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
+        let poke = filteredPokemons[indexPath.row]
+        performSegue(withIdentifier: "PokemonDetailVC", sender: poke)
+    }
+    
+    override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
+        if segue.identifier == "PokemonDetailVC" {
+            if let detailVC = segue.destination as? PokemonDetailVC {
+                if let poke = sender as? Pokemon {
+                    detailVC.pokemon = poke
+                }
+            }
         }
     }
     
